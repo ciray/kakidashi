@@ -8,5 +8,6 @@
         "editor.formatOnSave": true
       }
     }
-  }
+  },
+  "postCreateCommand": ".devcontainer/post_create.sh"
 }
