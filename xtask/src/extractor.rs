@@ -2,7 +2,7 @@
 use anyhow::{Context, Result};
 use scraper::{Html, Selector};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::models::{Author, Work};
 

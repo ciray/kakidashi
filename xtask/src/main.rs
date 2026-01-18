@@ -1,8 +1,7 @@
-use anyhow::{Context, Result};
-use scraper::{Html, Selector};
+use anyhow::Result;
 use std::env;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 mod extractor;
 mod models;
