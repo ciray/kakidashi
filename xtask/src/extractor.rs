@@ -1,4 +1,6 @@
 use anyhow::{Context, Result};
+use aozora_core::zip::read_first_txt_from_zip;
+use aozora2::strip::convert;
 use scraper::{Html, Selector};
 use std::fs;
 use std::path::Path;
@@ -150,6 +152,11 @@ pub fn extract_zip_path(
     }
 
     Ok(None)
+}
+
+pub fn extract_text_from_zip(zip_path: &Path) -> Result<String> {
+    let bytes = read_first_txt_from_zip(zip_path)?;
+    Ok(convert(&bytes))
 }
 
 /// href文字列からIDを抽出

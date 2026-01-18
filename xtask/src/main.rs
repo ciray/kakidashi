@@ -1,12 +1,13 @@
 use anyhow::Result;
 use std::env;
 use std::fs;
+use std::path::Path;
 use std::path::PathBuf;
 
 mod extractor;
 mod models;
 
-use extractor::{extract_authors, extract_works, extract_zip_path};
+use extractor::{extract_authors, extract_text_from_zip, extract_works, extract_zip_path};
 use models::WorkRecord;
 
 fn main() -> Result<()> {
@@ -51,6 +52,12 @@ fn generate_csv() -> Result<()> {
         let works = extract_works(&base_path, &author.id, &author.name)?;
         for work in works {
             let zip_path = extract_zip_path(&base_path, &author.id, &work.id)?;
+            let text = if let Some(ref zip) = zip_path {
+                extract_text_from_zip(Path::new(&zip))?
+            } else {
+                String::new()
+            };
+            println!("  Text: {}", &text);
 
             if let Some(zip) = zip_path {
                 records.push(WorkRecord {

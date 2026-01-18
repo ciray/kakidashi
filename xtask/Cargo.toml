@@ -5,9 +5,11 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1"
-scraper = "0.25"
-encoding_rs = "0.8"
+aozora-core = "0.7.1"
+aozora2 = "0.2.0"
 csv = "1.4"
+encoding_rs = "0.8"
+scraper = "0.25"
 serde = { version = "1", features = ["derive"] }
 
 [[bin]]
