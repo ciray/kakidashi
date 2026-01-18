@@ -76,8 +76,8 @@ fn write_csv(records: &[WorkRecord]) -> Result<()> {
     let output_path = "data/aozora_works.csv";
     let mut wtr = csv::Writer::from_path(output_path)?;
 
-    // Write header
-    wtr.write_record(&[
+    // ヘッダー
+    wtr.write_record([
         "author_id",
         "author_name",
         "work_id",
@@ -85,9 +85,9 @@ fn write_csv(records: &[WorkRecord]) -> Result<()> {
         "zip_file_path",
     ])?;
 
-    // Write records
+    // レコード
     for record in records {
-        wtr.write_record(&[
+        wtr.write_record([
             &record.author_id,
             &record.author_name,
             &record.work_id,

@@ -1,4 +1,3 @@
-// xtask/src/models.rs
 #[derive(Debug, Clone)]
 pub struct Author {
     pub id: String,
