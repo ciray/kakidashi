@@ -1,4 +1,5 @@
 use anyhow::Result;
+use rayon::prelude::*;
 use std::env;
 use std::fs;
 use std::path::Path;
@@ -32,44 +33,30 @@ fn main() -> Result<()> {
 }
 
 fn generate_csv() -> Result<()> {
-    let input_path = PathBuf::from(INPUT_PATH);
-    let author_list_path = input_path.join("index_pages/person_all.html");
-    let authors = extract_authors(&author_list_path)?;
-    let author_count = authors.len();
+    let records: Vec<WorkRecord> =
+        extract_authors(&PathBuf::from(INPUT_PATH).join("index_pages/person_all.html"))
+            .unwrap_or_default()
+            .into_par_iter()
+            .flat_map(|author| {
+                extract_works(&author)
+                    .unwrap_or_default()
+                    .into_par_iter()
+                    .flat_map(move |work| {
+                        let zip_path = extract_ruby_zip_path(Path::new(&work.page_path)).ok()??;
+                        let text = extract_text_from_zip(Path::new(&zip_path)).unwrap_or_default();
 
-    let records: Vec<WorkRecord> = authors
-        .into_iter()
-        .enumerate()
-        .flat_map(|(idx, author)| {
-            println!(
-                "Processing author {}/{}: {} (ID: {})",
-                idx + 1,
-                author_count,
-                author.name,
-                author.id
-            );
-
-            let works = extract_works(Path::new(&author.page_path)).unwrap_or_default();
-            println!("  Found {} works", works.len());
-
-            works.into_iter().filter_map(move |work| {
-                let zip_path = extract_ruby_zip_path(Path::new(&work.page_path)).ok()??;
-                let text = extract_text_from_zip(Path::new(&zip_path)).unwrap_or_default();
-                println!("  Text: {}", &text);
-
-                Some(WorkRecord {
-                    author_id: author.id.clone(),
-                    author_name: author.name.clone(),
-                    work_id: work.id,
-                    work_title: work.title,
-                    zip_file_path: zip_path,
-                })
+                        Some(WorkRecord {
+                            author_id: author.id.clone(),
+                            author_name: author.name.clone(),
+                            work_id: work.id,
+                            work_title: work.title,
+                            zip_file_path: zip_path,
+                        })
+                    })
             })
-        })
-        .collect();
+            .collect();
 
     write_csv(&records, OUTPUT_PATH)?;
-    println!("CSV file generated successfully.");
 
     Ok(())
 }

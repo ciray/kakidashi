@@ -8,8 +8,8 @@ use std::path::Path;
 use crate::models::{Author, Work};
 
 /// 著者一覧を抽出 (person_all.htmlより)
-pub fn extract_authors(author_list_path: &Path) -> Result<Vec<Author>> {
-    let document = read_html(author_list_path)?;
+pub fn extract_authors(author_list_path: &Path) -> Option<Vec<Author>> {
+    let document = read_html(author_list_path).ok()?;
     let index_pages_dir = author_list_path.parent().unwrap_or(Path::new("."));
 
     let list_item_selector = Selector::parse("ol > li").unwrap();
@@ -36,18 +36,19 @@ pub fn extract_authors(author_list_path: &Path) -> Result<Vec<Author>> {
         })
         .collect();
 
-    Ok(authors)
+    Some(authors)
 }
 
 /// 作品一覧を抽出 (著者ページより)
 ///
 /// 著者ページが存在しない場合は空のVecを返す
-pub fn extract_works(author_page_path: &Path) -> Result<Vec<Work>> {
-    if !author_page_path.exists() {
-        return Ok(Vec::new());
+pub fn extract_works(author: &Author) -> Option<Vec<Work>> {
+    if !Path::new(&author.page_path).exists() {
+        return Some(Vec::new());
     }
 
-    let document = read_html(author_page_path)?;
+    let author_page_path = Path::new(&author.page_path);
+    let document = read_html(author_page_path).ok()?;
     let cards_dir = author_page_path
         .parent()
         .and_then(|p| p.parent())
@@ -85,7 +86,7 @@ pub fn extract_works(author_page_path: &Path) -> Result<Vec<Work>> {
         })
         .collect();
 
-    Ok(works)
+    Some(works)
 }
 
 /// 作品のzipファイルパス(ルビ付きテキスト)を抽出
