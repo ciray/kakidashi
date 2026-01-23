@@ -2,12 +2,14 @@
 pub struct Author {
     pub id: String,
     pub name: String,
+    pub page_path: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct Work {
     pub id: String,
     pub title: String,
+    pub page_path: String,
 }
 
 #[derive(Debug, Clone)]

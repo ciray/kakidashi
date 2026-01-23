@@ -8,9 +8,9 @@ use std::path::Path;
 use crate::models::{Author, Work};
 
 /// 著者一覧を抽出 (person_all.htmlより)
-pub fn extract_authors(base_path: &Path) -> Result<Vec<Author>> {
-    let html_path = base_path.join("index_pages/person_all.html");
-    let document = read_html(&html_path)?;
+pub fn extract_authors(author_list_path: &Path) -> Result<Vec<Author>> {
+    let document = read_html(author_list_path)?;
+    let index_pages_dir = author_list_path.parent().unwrap_or(Path::new("."));
 
     let list_item_selector = Selector::parse("ol > li").unwrap();
     let anchor_selector = Selector::parse("a").unwrap();
@@ -24,7 +24,14 @@ pub fn extract_authors(base_path: &Path) -> Result<Vec<Author>> {
             li.select(&anchor_selector).next().and_then(|anchor| {
                 let href = anchor.value().attr("href").unwrap_or("");
                 let name = anchor.text().collect::<String>().trim().to_string();
-                parse_id_from_href(href, "person", ".html").map(|id| Author { id, name })
+                parse_id_from_href(href, "person", ".html").map(|id| {
+                    let page_path = index_pages_dir.join(format!("person{}.html", id));
+                    Author {
+                        id,
+                        name,
+                        page_path: page_path.to_string_lossy().to_string(),
+                    }
+                })
             })
         })
         .collect();
@@ -35,14 +42,17 @@ pub fn extract_authors(base_path: &Path) -> Result<Vec<Author>> {
 /// 作品一覧を抽出 (著者ページより)
 ///
 /// 著者ページが存在しない場合は空のVecを返す
-pub fn extract_works(base_path: &Path, author_id: &str) -> Result<Vec<Work>> {
-    let html_path = base_path.join(format!("index_pages/person{}.html", author_id));
-
-    if !html_path.exists() {
+pub fn extract_works(author_page_path: &Path) -> Result<Vec<Work>> {
+    if !author_page_path.exists() {
         return Ok(Vec::new());
     }
 
-    let document = read_html(&html_path)?;
+    let document = read_html(author_page_path)?;
+    let cards_dir = author_page_path
+        .parent()
+        .and_then(|p| p.parent())
+        .map(|p| p.join("cards"))
+        .unwrap_or_default();
 
     let list_item_selector = Selector::parse("ol > li").unwrap();
     let anchor_selector = Selector::parse("a").unwrap();
@@ -59,7 +69,18 @@ pub fn extract_works(base_path: &Path, author_id: &str) -> Result<Vec<Work>> {
             li.select(&anchor_selector).next().and_then(|anchor| {
                 let href = anchor.value().attr("href").unwrap_or("");
                 let title = anchor.text().collect::<String>().trim().to_string();
-                parse_id_from_href(href, "card", ".html").map(|id| Work { id, title })
+                parse_id_from_href(href, "card", ".html").and_then(|id| {
+                    // href: ../cards/001257/card59898.html から author_id を抽出
+                    let author_id = href
+                        .strip_prefix("../cards/")
+                        .and_then(|s| s.split('/').next())?;
+                    let page_path = cards_dir.join(author_id).join(format!("card{}.html", id));
+                    Some(Work {
+                        id,
+                        title,
+                        page_path: page_path.to_string_lossy().to_string(),
+                    })
+                })
             })
         })
         .collect();
@@ -70,19 +91,13 @@ pub fn extract_works(base_path: &Path, author_id: &str) -> Result<Vec<Work>> {
 /// 作品のzipファイルパス(ルビ付きテキスト)を抽出
 ///
 /// 作品カードページが存在しない、またはzipが見つからない場合はNoneを返す
-pub fn extract_ruby_zip_path(
-    base_path: &Path,
-    author_id: &str,
-    work_id: &str,
-) -> Result<Option<String>> {
-    let padded_author_id = format!("{:06}", author_id.parse::<u32>().unwrap_or(0));
-    let html_path = base_path.join(format!("cards/{}/card{}.html", padded_author_id, work_id));
-
-    if !html_path.exists() {
+pub fn extract_ruby_zip_path(work_page_path: &Path) -> Result<Option<String>> {
+    if !work_page_path.exists() {
         return Ok(None);
     }
 
-    let document = read_html(&html_path)?;
+    let document = read_html(work_page_path)?;
+    let work_dir = work_page_path.parent().unwrap_or(Path::new("."));
 
     let table_row_selector = Selector::parse("tr[bgcolor='white']").unwrap();
     let anchor_selector = Selector::parse("a").unwrap();
@@ -99,11 +114,10 @@ pub fn extract_ruby_zip_path(
                 .and_then(|anchor| anchor.value().attr("href"))
                 .filter(|href| href.ends_with(".zip"))
                 .map(|href| {
-                    format!(
-                        "aozorabunko/cards/{}/{}",
-                        padded_author_id,
-                        href.trim_start_matches("./")
-                    )
+                    work_dir
+                        .join(href.trim_start_matches("./"))
+                        .to_string_lossy()
+                        .to_string()
                 })
         });
 
@@ -111,8 +125,6 @@ pub fn extract_ruby_zip_path(
 }
 
 /// zipファイルからテキストを抽出
-///
-/// zipファイル内の最初のtxtファイルを読み込み、ルビ記号等を除去したプレーンテキストを返す
 pub fn extract_text_from_zip(zip_path: &Path) -> Result<String> {
     let bytes = read_first_txt_from_zip(zip_path)?;
     Ok(convert(&bytes))
