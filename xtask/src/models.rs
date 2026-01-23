@@ -13,11 +13,17 @@ pub struct Work {
 }
 
 #[derive(Debug, Clone)]
+pub struct WorkLink {
+    pub zip_path: String,
+    pub html_link: Option<String>,
+}
+
+#[derive(Debug, Clone)]
 pub struct WorkRecord {
     pub author_id: String,
     pub author_name: String,
     pub work_id: String,
     pub work_title: String,
-    pub zip_file_path: String,
+    pub html_link: Option<String>,
     pub text: String,
 }

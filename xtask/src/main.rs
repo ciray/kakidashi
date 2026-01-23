@@ -8,7 +8,7 @@ use std::path::PathBuf;
 mod extractor;
 mod models;
 
-use extractor::{extract_authors, extract_ruby_zip_path, extract_text_from_zip, extract_works};
+use extractor::{extract_authors, extract_links, extract_text_from_zip, extract_works};
 use models::WorkRecord;
 
 const INPUT_PATH: &str = "aozorabunko";
@@ -42,15 +42,16 @@ fn generate_csv() -> Result<()> {
                     .unwrap_or_default()
                     .into_par_iter()
                     .flat_map(move |work| {
-                        let zip_path = extract_ruby_zip_path(Path::new(&work.page_path)).ok()??;
-                        let text = extract_text_from_zip(Path::new(&zip_path)).unwrap_or_default();
+                        let work_link = extract_links(Path::new(&work.page_path))?;
+                        let text = extract_text_from_zip(Path::new(&work_link.zip_path))
+                            .unwrap_or_default();
 
                         Some(WorkRecord {
                             author_id: author.id.clone(),
                             author_name: author.name.clone(),
                             work_id: work.id,
                             work_title: work.title,
-                            zip_file_path: zip_path,
+                            html_link: work_link.html_link,
                             text,
                         })
                     })
@@ -74,7 +75,7 @@ fn write_csv(records: &[WorkRecord], output_path: &str) -> Result<()> {
         "author_name",
         "work_id",
         "work_title",
-        "zip_file_path",
+        "html_link",
         "text",
     ])?;
 
@@ -85,7 +86,7 @@ fn write_csv(records: &[WorkRecord], output_path: &str) -> Result<()> {
             &record.author_name,
             &record.work_id,
             &record.work_title,
-            &record.zip_file_path,
+            &record.html_link.clone().unwrap_or_default(),
             &record.text,
         ])?;
     }

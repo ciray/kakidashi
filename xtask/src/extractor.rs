@@ -5,7 +5,7 @@ use scraper::{Html, Selector};
 use std::fs;
 use std::path::Path;
 
-use crate::models::{Author, Work};
+use crate::models::{Author, Work, WorkLink};
 
 /// 著者一覧を抽出 (person_all.htmlより)
 pub fn extract_authors(author_list_path: &Path) -> Option<Vec<Author>> {
@@ -89,40 +89,75 @@ pub fn extract_works(author: &Author) -> Option<Vec<Work>> {
     Some(works)
 }
 
-/// 作品のzipファイルパス(ルビ付きテキスト)を抽出
+/// 作品のzip/htmlファイルパスを抽出
 ///
-/// 作品カードページが存在しない、またはzipが見つからない場合はNoneを返す
-pub fn extract_ruby_zip_path(work_page_path: &Path) -> Result<Option<String>> {
+/// ダウンロードデータtable内の全行をリスト化し、その中から条件に合致する行を抽出
+/// 1. リンク先が存在し"./files"で始まる行
+/// 2. 末尾が`.zip`で終わる行をテキストzipファイルリンクとみなす
+///   - "ttz_zip"は除外
+///   - 複数行となった場合は最初の1行のみ
+///   - 存在しない場合は処理を停止しNoneを返す
+/// 3. 末尾が`.html`または`.htm`で終わる行をHTMLファイルリンクとみなす
+///   - 存在しない場合はNoneとする
+pub fn extract_links(work_page_path: &Path) -> Option<WorkLink> {
     if !work_page_path.exists() {
-        return Ok(None);
+        return None;
     }
 
-    let document = read_html(work_page_path)?;
+    let aozora_url = "https://www.aozora.gr.jp";
     let work_dir = work_page_path.parent().unwrap_or(Path::new("."));
+    let document = read_html(work_page_path).ok()?;
+    let table_selector = Selector::parse(r#"table.download"#).ok()?;
+    let link_selector = Selector::parse("a[href]").ok()?;
 
-    let table_row_selector = Selector::parse("tr[bgcolor='white']").unwrap();
-    let anchor_selector = Selector::parse("a").unwrap();
+    // ダウンロードテーブル内の全リンクを抽出
+    let links: Vec<String> = document
+        .select(&table_selector)
+        .next()?
+        .select(&link_selector)
+        .filter_map(|link| link.value().attr("href"))
+        .filter(|href| href.starts_with("./files"))
+        .map(String::from)
+        .collect();
+    if links.is_empty() {
+        return None;
+    }
 
-    let has_ruby_zip = |html: &str| html.contains("ルビあり") && html.contains(".zip");
+    // zipパスを抽出
+    let zip_path = links
+        .iter()
+        .filter(|link| link.starts_with("./files"))
+        .filter(|link| link.ends_with(".zip"))
+        .find(|link| !link.contains("_ttz.zip") && !link.ends_with("ttz.zip"))
+        .map(|link| {
+            work_dir
+                .join(link.trim_start_matches("./"))
+                .to_string_lossy()
+                .to_string()
+        })?
+        .clone();
+    if zip_path.is_empty() {
+        return None;
+    }
 
-    let zip_path = document
-        .select(&table_row_selector)
-        .map(|row| (row.html(), row))
-        .filter(|(html, _)| has_ruby_zip(html))
-        .find_map(|(_, row)| {
-            row.select(&anchor_selector)
-                .next()
-                .and_then(|anchor| anchor.value().attr("href"))
-                .filter(|href| href.ends_with(".zip"))
-                .map(|href| {
-                    work_dir
-                        .join(href.trim_start_matches("./"))
-                        .to_string_lossy()
-                        .to_string()
-                })
-        });
+    // htmlパスを抽出
+    let html_path = links
+        .iter()
+        .filter(|link| link.starts_with("./files"))
+        .find(|link| link.ends_with(".html") || link.ends_with(".htm"))
+        .map(|link| {
+            work_dir
+                .join(link.trim_start_matches("./"))
+                .to_string_lossy()
+                .to_string()
+                .replace("aozorabunko", aozora_url)
+        })
+        .clone();
 
-    Ok(zip_path)
+    Some(WorkLink {
+        zip_path,
+        html_link: html_path,
+    })
 }
 
 /// zipファイルから書き出しテキストを抽出
@@ -130,12 +165,16 @@ pub fn extract_text_from_zip(zip_path: &Path) -> Option<String> {
     let bytes = read_first_txt_from_zip(zip_path).ok()?;
     let text = convert(&bytes);
 
-    // TODO: 最初の一行とみなす条件
-    // - 全角スペースで始まる最初の行
+    // 書き出しとみなす条件 (TODO: 未検証)
+    // - 全角スペースで始まる
+    // - `。`を含む
+    // 最初の`。`までを抽出
     let first_line = text
         .lines()
-        .find(|line| line.starts_with('　'))
+        .filter(|line| line.starts_with('　'))
+        .find(|line| line.contains('。'))
         .map(|line| line.trim_start_matches('　'))
+        .map(|line| line.split('。').next().unwrap_or("").to_string() + "。")
         .unwrap_or_default()
         .to_string();
 
@@ -174,6 +213,74 @@ mod tests {
         assert_eq!(
             parse_id_from_href("../cards/001257/card59898.html", "card", ".html"),
             Some("59898".to_string())
+        );
+    }
+
+    #[test]
+    // テキストファイルとHTMLファイルがともに1つずつ存在するケース
+    fn test_extract_ruby_zip_path() {
+        let work_page_path = Path::new("../aozorabunko/cards/000006/card47064.html");
+        let work_link = extract_links(work_page_path).unwrap();
+        assert_eq!(
+            work_link.zip_path,
+            "../aozorabunko/cards/000006/files/47064_txt_31250.zip".to_string()
+        );
+        assert_eq!(
+            work_link.html_link,
+            Some("../https://www.aozora.gr.jp/cards/000006/files/47064_31847.html".to_string())
+        );
+    }
+
+    #[test]
+    // テキストファイルを含まないケース
+    fn test_extract_only_html_zip_path() {
+        let work_page_path = Path::new("../aozorabunko/cards/001529/card409.html");
+        let work_link = extract_links(work_page_path);
+        assert!(work_link.is_none());
+    }
+
+    #[test]
+    // テキストファイル1つとHTMLファイル2つ存在するケース
+    fn test_extract_only_text_zip_path() {
+        let work_page_path = Path::new("../aozorabunko/cards/001393/card54926.html");
+        let work_link = extract_links(work_page_path).unwrap();
+        assert_eq!(
+            work_link.zip_path,
+            "../aozorabunko/cards/001393/files/54926_txt_47247.zip".to_string()
+        );
+        assert_eq!(
+            work_link.html_link,
+            Some("../https://www.aozora.gr.jp/cards/001393/files/54926_53265.html".to_string())
+        );
+    }
+
+    #[test]
+    // テキストファイルとTTZファイル(zip)も含むケース
+    fn test_extract_text_and_ttz_zip_path() {
+        let work_page_path = Path::new("../aozorabunko/cards/000148/card769.html");
+        let work_link = extract_links(work_page_path).unwrap();
+        assert_eq!(
+            work_link.zip_path,
+            "../aozorabunko/cards/000148/files/769_ruby_565.zip".to_string()
+        );
+        assert_eq!(
+            work_link.html_link,
+            Some("../https://www.aozora.gr.jp/cards/000148/files/769_14939.html".to_string())
+        );
+    }
+
+    #[test]
+    // HTMLファイル(.files配下ではない)を含むケース
+    fn test_extract_html_file_not_in_files() {
+        let work_page_path = Path::new("../aozorabunko/cards/001393/card54926.html");
+        let work_link = extract_links(work_page_path).unwrap();
+        assert_eq!(
+            work_link.zip_path,
+            "../aozorabunko/cards/001393/files/54926_txt_47247.zip".to_string()
+        );
+        assert_eq!(
+            work_link.html_link,
+            Some("../https://www.aozora.gr.jp/cards/001393/files/54926_53265.html".to_string())
         );
     }
 }
