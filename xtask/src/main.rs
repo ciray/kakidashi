@@ -51,6 +51,7 @@ fn generate_csv() -> Result<()> {
                             work_id: work.id,
                             work_title: work.title,
                             zip_file_path: zip_path,
+                            text,
                         })
                     })
             })
@@ -74,6 +75,7 @@ fn write_csv(records: &[WorkRecord], output_path: &str) -> Result<()> {
         "work_id",
         "work_title",
         "zip_file_path",
+        "text",
     ])?;
 
     // レコード
@@ -84,6 +86,7 @@ fn write_csv(records: &[WorkRecord], output_path: &str) -> Result<()> {
             &record.work_id,
             &record.work_title,
             &record.zip_file_path,
+            &record.text,
         ])?;
     }
 

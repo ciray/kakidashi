@@ -19,4 +19,5 @@ pub struct WorkRecord {
     pub work_id: String,
     pub work_title: String,
     pub zip_file_path: String,
+    pub text: String,
 }

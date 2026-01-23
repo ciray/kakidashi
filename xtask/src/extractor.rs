@@ -125,10 +125,21 @@ pub fn extract_ruby_zip_path(work_page_path: &Path) -> Result<Option<String>> {
     Ok(zip_path)
 }
 
-/// zipファイルからテキストを抽出
-pub fn extract_text_from_zip(zip_path: &Path) -> Result<String> {
-    let bytes = read_first_txt_from_zip(zip_path)?;
-    Ok(convert(&bytes))
+/// zipファイルから書き出しテキストを抽出
+pub fn extract_text_from_zip(zip_path: &Path) -> Option<String> {
+    let bytes = read_first_txt_from_zip(zip_path).ok()?;
+    let text = convert(&bytes);
+
+    // TODO: 最初の一行とみなす条件
+    // - 全角スペースで始まる最初の行
+    let first_line = text
+        .lines()
+        .find(|line| line.starts_with('　'))
+        .map(|line| line.trim_start_matches('　'))
+        .unwrap_or_default()
+        .to_string();
+
+    Some(first_line)
 }
 
 /// HTMLファイルを読み込みパースする
