@@ -7,7 +7,7 @@ use std::path::PathBuf;
 mod extractor;
 mod models;
 
-use extractor::{extract_authors, extract_text_from_zip, extract_works, extract_zip_path};
+use extractor::{extract_authors, extract_ruby_zip_path, extract_text_from_zip, extract_works};
 use models::WorkRecord;
 
 fn main() -> Result<()> {
@@ -30,48 +30,41 @@ fn main() -> Result<()> {
 
 fn generate_csv() -> Result<()> {
     let base_path = PathBuf::from("aozorabunko");
-
-    if !base_path.exists() {
-        anyhow::bail!("aozorabunko directory not found. Please initialize the submodule.");
-    }
-
-    println!("Extracting authors from person_all.html...");
     let authors = extract_authors(&base_path)?;
-    println!("Found {} authors", authors.len());
+    let author_count = authors.len();
 
-    let mut records = Vec::new();
-    for (idx, author) in authors.iter().enumerate() {
-        println!(
-            "Processing author {}/{}: {} (ID: {})",
-            idx + 1,
-            authors.len(),
-            author.name,
-            author.id
-        );
+    let records: Vec<WorkRecord> = authors
+        .into_iter()
+        .enumerate()
+        .flat_map(|(idx, author)| {
+            println!(
+                "Processing author {}/{}: {} (ID: {})",
+                idx + 1,
+                author_count,
+                author.name,
+                author.id
+            );
 
-        let works = extract_works(&base_path, &author.id, &author.name)?;
-        for work in works {
-            let zip_path = extract_zip_path(&base_path, &author.id, &work.id)?;
-            let text = if let Some(ref zip) = zip_path {
-                extract_text_from_zip(Path::new(&zip))?
-            } else {
-                String::new()
-            };
-            println!("  Text: {}", &text);
+            let works = extract_works(&base_path, &author.id).unwrap_or_default();
+            println!("  Found {} works", works.len());
 
-            if let Some(zip) = zip_path {
-                records.push(WorkRecord {
+            let base_path = base_path.clone();
+            works.into_iter().filter_map(move |work| {
+                let zip_path = extract_ruby_zip_path(&base_path, &author.id, &work.id).ok()??;
+                let text = extract_text_from_zip(Path::new(&zip_path)).unwrap_or_default();
+                println!("  Text: {}", &text);
+
+                Some(WorkRecord {
                     author_id: author.id.clone(),
                     author_name: author.name.clone(),
                     work_id: work.id,
                     work_title: work.title,
-                    zip_file_path: zip,
-                });
-            }
-        }
-    }
+                    zip_file_path: zip_path,
+                })
+            })
+        })
+        .collect();
 
-    println!("\nWriting CSV with {} records...", records.len());
     write_csv(&records)?;
     println!("CSV file generated successfully: data/aozora_works.csv");
 
