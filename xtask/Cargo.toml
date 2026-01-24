@@ -7,11 +7,9 @@ edition = "2024"
 anyhow = "1"
 aozora-core = "0.7.1"
 aozora2 = "0.2.0"
-csv = "1.4"
-encoding_rs = "0.8"
+csv = "1.4.0"
 rayon = "1.11.0"
 scraper = "0.25"
-serde = { version = "1", features = ["derive"] }
 
 [[bin]]
 name = "xtask"
