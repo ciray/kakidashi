@@ -609,6 +609,7 @@ name = "kakidashi"
 version = "0.1.0"
 dependencies = [
  "csv",
+ "flate2",
  "rand",
 ]
 
