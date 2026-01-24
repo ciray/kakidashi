@@ -15,7 +15,7 @@ fn main() {
     let records: Vec<csv::StringRecord> = reader.records().filter_map(Result::ok).collect();
     let mut rng = rand::rng();
     if let Some(random_record) = records.choose(&mut rng) {
-        if let Some(text) = random_record.get(5) {
+        if let Some(text) = random_record.get(2) {
             println!("{text}");
         } else {
             println!("No 'text' column found in the selected record.");

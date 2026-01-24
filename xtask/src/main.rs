@@ -1,6 +1,5 @@
 use anyhow::Result;
 use rayon::prelude::*;
-use std::env;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
@@ -15,19 +14,7 @@ const INPUT_PATH: &str = "aozorabunko";
 const OUTPUT_PATH: &str = "src/resources/data.csv";
 
 fn main() -> Result<()> {
-    let args: Vec<String> = env::args().collect();
-
-    if args.len() < 2 {
-        eprintln!("Usage: cargo xtask <command>");
-        eprintln!("Commands:");
-        eprintln!("  generate-csv  - Generate works CSV from aozorabunko");
-        return Ok(());
-    }
-
-    match args[1].as_str() {
-        "generate-csv" => generate_csv()?,
-        _ => eprintln!("Unknown command: {}", args[1]),
-    }
+    generate_csv()?;
 
     Ok(())
 }
@@ -56,7 +43,17 @@ fn generate_csv() -> Result<()> {
                         })
                     })
             })
-            .collect();
+            .collect::<Vec<WorkRecord>>();
+
+    let mut records = records;
+    records.sort_by_key(|r| {
+        (
+            r.author_name.clone(),
+            r.work_title.clone(),
+            r.text.clone(),
+            r.html_link.clone(),
+        )
+    });
 
     write_csv(&records, OUTPUT_PATH)?;
 
@@ -69,25 +66,12 @@ fn write_csv(records: &[WorkRecord], output_path: &str) -> Result<()> {
     }
     let mut wtr = csv::Writer::from_path(output_path)?;
 
-    // ヘッダー
-    wtr.write_record([
-        "author_id",
-        "author_name",
-        "work_id",
-        "work_title",
-        "html_link",
-        "text",
-    ])?;
-
-    // レコード
     for record in records {
         wtr.write_record([
-            &record.author_id,
             &record.author_name,
-            &record.work_id,
             &record.work_title,
-            &record.html_link.clone().unwrap_or_default(),
             &record.text,
+            &record.html_link.clone().unwrap_or_default(),
         ])?;
     }
 
