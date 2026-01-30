@@ -39,18 +39,15 @@ pub struct Args {
 
 fn main() {
     let args = Args::parse();
-    println!(
-        "number: {}, all: {}, format: {:?}, queries: {:?}",
-        args.number, args.all, args.format, args.query
-    );
 
     let bytes = include_bytes!("resources/data.csv.gz");
     let records = read(bytes);
 
-    println!("Total records after filtering: {}", records.len());
-
     let n = if args.all { records.len() } else { args.number };
-    records.filter(&args.query).choose_random(n).print_text();
+    records
+        .filter(&args.query)
+        .choose_random(n)
+        .print(&args.format);
 }
 
 fn read(bytes: &[u8]) -> Vec<WorkRecord> {

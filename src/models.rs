@@ -1,21 +1,22 @@
 use clap::ValueEnum;
 use rand::seq::IndexedRandom;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use serde_json::to_string_pretty;
 use std::str::FromStr;
 
 // 作品データ
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct WorkRecord {
     author: String,
     title: String,
     pub text: String,
-    html_link: Option<String>,
+    url: Option<String>,
 }
 
 pub trait WorkRecords {
     fn choose_random(&self, n: usize) -> Vec<WorkRecord>;
     fn filter(&self, queries: &[Query]) -> Vec<WorkRecord>;
-    fn print_text(&self);
+    fn print(&self, format: &Format);
 }
 
 impl WorkRecords for Vec<WorkRecord> {
@@ -36,9 +37,38 @@ impl WorkRecords for Vec<WorkRecord> {
             .collect()
     }
 
-    fn print_text(&self) {
-        for record in self {
-            println!("{}", record.text);
+    fn print(&self, format: &Format) {
+        if self.is_empty() {
+            return;
+        }
+
+        match format {
+            Format::Plain => {
+                for record in self {
+                    println!("{}", record.text);
+                }
+            }
+            Format::Quote => {
+                // 書き出し文｜著者名『書名』
+                for record in self {
+                    println!("{}｜{}『{}』", record.text, record.author, record.title);
+                }
+            }
+            Format::Csv => {
+                let mut writer = csv::Writer::from_writer(std::io::stdout());
+                for record in self {
+                    writer.serialize(record).expect("Failed to write CSV");
+                }
+                writer.flush().expect("Failed to flush CSV writer");
+            }
+            Format::Json => {
+                let json = if self.len() == 1 {
+                    to_string_pretty(&self[0]).expect("Failed to serialize to JSON")
+                } else {
+                    to_string_pretty(&self).expect("Failed to serialize to JSON")
+                };
+                println!("{json}");
+            }
         }
     }
 }
