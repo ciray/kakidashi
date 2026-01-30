@@ -1,26 +1,67 @@
+use clap::Parser;
 use flate2::read::MultiGzDecoder;
-use rand::seq::IndexedRandom;
 use std::io::Read;
 
-fn main() {
-    let bytes = include_bytes!("resources/data.csv.gz");
+mod models;
 
-    let mut decoder = MultiGzDecoder::new(&bytes[..]);
-    let mut csv_text = Vec::new();
-    decoder
-        .read_to_end(&mut csv_text)
+use models::WorkRecord;
+use models::{Format, Query};
+
+use crate::models::WorkRecords;
+
+#[derive(Parser, Debug)]
+#[command(version, about)]
+pub struct Args {
+    #[arg(short, long, default_value_t = 1, help = "Number of records to output")]
+    pub number: usize,
+
+    #[arg(
+        short,
+        long,
+        default_value_t = false,
+        conflicts_with = "number",
+        help = "Output all records [conflicts with --number]"
+    )]
+    pub all: bool,
+
+    #[arg(short, long, help = "Output format")]
+    #[clap(value_enum, default_value_t=Format::Plain)]
+    pub format: Format,
+
+    #[arg(
+        short,
+        long,
+        help = "Filter queries [format: key=value] [possible keys: author, title]",
+        value_parser
+    )]
+    pub query: Vec<Query>,
+}
+
+fn main() {
+    let args = Args::parse();
+    println!(
+        "number: {}, all: {}, format: {:?}, queries: {:?}",
+        args.number, args.all, args.format, args.query
+    );
+
+    let bytes = include_bytes!("resources/data.csv.gz");
+    let records = read(bytes);
+
+    println!("Total records after filtering: {}", records.len());
+
+    let n = if args.all { records.len() } else { args.number };
+    records.filter(&args.query).choose_random(n).print_text();
+}
+
+fn read(bytes: &[u8]) -> Vec<WorkRecord> {
+    let mut decompressed = Vec::new();
+    MultiGzDecoder::new(bytes)
+        .read_to_end(&mut decompressed)
         .expect("Failed to decompress data");
 
-    let mut reader = csv::Reader::from_reader(csv_text.as_slice());
-    let records: Vec<csv::StringRecord> = reader.records().filter_map(Result::ok).collect();
-    let mut rng = rand::rng();
-    if let Some(random_record) = records.choose(&mut rng) {
-        if let Some(text) = random_record.get(2) {
-            println!("{text}");
-        } else {
-            println!("No 'text' column found in the selected record.");
-        }
-    } else {
-        println!("No records found in the CSV.");
-    }
+    let mut csv = csv::ReaderBuilder::new()
+        .has_headers(false)
+        .from_reader(&decompressed[..]);
+
+    csv.deserialize().filter_map(Result::ok).collect()
 }
