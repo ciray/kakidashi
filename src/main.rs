@@ -5,9 +5,8 @@ use std::io::Read;
 mod models;
 
 use models::WorkRecord;
+use models::WorkRecords;
 use models::{Format, Query};
-
-use crate::models::WorkRecords;
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
@@ -23,6 +22,13 @@ pub struct Args {
         help = "Output all records [conflicts with --number]"
     )]
     pub all: bool,
+
+    #[arg(
+        long,
+        default_value_t = false,
+        help = "Disable randomization of records"
+    )]
+    pub no_random: bool,
 
     #[arg(short, long, help = "Output format")]
     #[clap(value_enum, default_value_t=Format::Plain)]
@@ -46,7 +52,8 @@ fn main() {
     let n = if args.all { records.len() } else { args.number };
     records
         .filter(&args.query)
-        .choose_random(n)
+        .random(!args.no_random)
+        .take(n)
         .print(&args.format);
 }
 

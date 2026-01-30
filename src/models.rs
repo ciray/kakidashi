@@ -1,5 +1,5 @@
 use clap::ValueEnum;
-use rand::seq::IndexedRandom;
+use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use serde_json::to_string_pretty;
 use std::str::FromStr;
@@ -14,15 +14,26 @@ pub struct WorkRecord {
 }
 
 pub trait WorkRecords {
-    fn choose_random(&self, n: usize) -> Vec<WorkRecord>;
+    fn random(&self, random: bool) -> Vec<WorkRecord>;
+    fn take(&self, n: usize) -> Vec<WorkRecord>;
     fn filter(&self, queries: &[Query]) -> Vec<WorkRecord>;
     fn print(&self, format: &Format);
 }
 
 impl WorkRecords for Vec<WorkRecord> {
-    fn choose_random(&self, n: usize) -> Vec<WorkRecord> {
+    fn random(&self, random: bool) -> Vec<WorkRecord> {
+        if !random {
+            return self.clone();
+        }
+
         let mut rng = rand::rng();
-        self.choose_multiple(&mut rng, n).take(n).cloned().collect()
+        let mut records = self.clone();
+        records.shuffle(&mut rng);
+        records
+    }
+
+    fn take(&self, n: usize) -> Vec<WorkRecord> {
+        self.iter().take(n).cloned().collect()
     }
 
     fn filter(&self, queries: &[Query]) -> Vec<WorkRecord> {
