@@ -6,22 +6,22 @@ use std::str::FromStr;
 
 // 作品データ
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct WorkRecord {
+pub struct Work {
     author: String,
     title: String,
     pub text: String,
     url: Option<String>,
 }
 
-pub trait WorkRecords {
-    fn random(&self, random: bool) -> Vec<WorkRecord>;
-    fn take(&self, n: usize) -> Vec<WorkRecord>;
-    fn filter(&self, queries: &[Query]) -> Vec<WorkRecord>;
+pub trait Works {
+    fn random(&self, random: bool) -> Vec<Work>;
+    fn take(&self, n: usize) -> Vec<Work>;
+    fn filter(&self, queries: &[Query]) -> Vec<Work>;
     fn print(&self, format: &Format, template: Option<&String>);
 }
 
-impl WorkRecords for Vec<WorkRecord> {
-    fn random(&self, random: bool) -> Vec<WorkRecord> {
+impl Works for Vec<Work> {
+    fn random(&self, random: bool) -> Vec<Work> {
         if !random {
             return self.clone();
         }
@@ -32,11 +32,11 @@ impl WorkRecords for Vec<WorkRecord> {
         records
     }
 
-    fn take(&self, n: usize) -> Vec<WorkRecord> {
+    fn take(&self, n: usize) -> Vec<Work> {
         self.iter().take(n).cloned().collect()
     }
 
-    fn filter(&self, queries: &[Query]) -> Vec<WorkRecord> {
+    fn filter(&self, queries: &[Query]) -> Vec<Work> {
         self.iter()
             .filter(|record| {
                 queries.iter().all(|query| match query.key {

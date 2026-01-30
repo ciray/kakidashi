@@ -4,8 +4,8 @@ use std::io::Read;
 
 mod models;
 
-use models::WorkRecord;
-use models::WorkRecords;
+use models::Work;
+use models::Works;
 use models::{Format, Query};
 
 fn main() {
@@ -15,12 +15,12 @@ fn main() {
     }
 
     let bytes = include_bytes!("resources/data.csv.gz");
-    let records = read(bytes);
+    let works = read(bytes);
 
-    records
+    works
         .filter(&args.query)
         .random(!args.no_random)
-        .take(if args.all { records.len() } else { args.number })
+        .take(if args.all { works.len() } else { args.number })
         .print(&args.format, args.template.as_ref());
 }
 
@@ -98,7 +98,7 @@ impl Args {
     }
 }
 
-fn read(bytes: &[u8]) -> Vec<WorkRecord> {
+fn read(bytes: &[u8]) -> Vec<Work> {
     let mut decompressed = Vec::new();
     MultiGzDecoder::new(bytes)
         .read_to_end(&mut decompressed)
