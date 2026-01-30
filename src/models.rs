@@ -17,7 +17,7 @@ pub trait WorkRecords {
     fn random(&self, random: bool) -> Vec<WorkRecord>;
     fn take(&self, n: usize) -> Vec<WorkRecord>;
     fn filter(&self, queries: &[Query]) -> Vec<WorkRecord>;
-    fn print(&self, format: &Format);
+    fn print(&self, format: &Format, template: Option<&String>);
 }
 
 impl WorkRecords for Vec<WorkRecord> {
@@ -42,13 +42,14 @@ impl WorkRecords for Vec<WorkRecord> {
                 queries.iter().all(|query| match query.key {
                     QueryKey::Author => record.author.contains(&query.value),
                     QueryKey::Title => record.title.contains(&query.value),
+                    QueryKey::Text => record.text.contains(&query.value),
                 })
             })
             .cloned()
             .collect()
     }
 
-    fn print(&self, format: &Format) {
+    fn print(&self, format: &Format, template: Option<&String>) {
         if self.is_empty() {
             return;
         }
@@ -60,9 +61,15 @@ impl WorkRecords for Vec<WorkRecord> {
                 }
             }
             Format::Quote => {
-                // 書き出し文｜著者名『書名』
+                let template = template.map_or("{text}｜{author}『{title}』", |v| v);
                 for record in self {
-                    println!("{}｜{}『{}』", record.text, record.author, record.title);
+                    let output = template
+                        .replace("\\n", "\n")
+                        .replace("{author}", &record.author)
+                        .replace("{title}", &record.title)
+                        .replace("{text}", &record.text)
+                        .replace("{url}", record.url.as_deref().unwrap_or(""));
+                    println!("{output}");
                 }
             }
             Format::Csv => {
@@ -85,14 +92,6 @@ impl WorkRecords for Vec<WorkRecord> {
 }
 
 /// CLIオプション
-#[derive(ValueEnum, Clone, Debug)]
-pub enum Format {
-    Plain,
-    Quote,
-    Csv,
-    Json,
-}
-
 #[derive(Clone, Debug)]
 pub struct Query {
     key: QueryKey,
@@ -103,6 +102,7 @@ pub struct Query {
 enum QueryKey {
     Author,
     Title,
+    Text,
 }
 
 impl FromStr for Query {
@@ -119,4 +119,12 @@ impl FromStr for Query {
             value: value.to_string(),
         })
     }
+}
+
+#[derive(ValueEnum, Clone, Debug)]
+pub enum Format {
+    Plain,
+    Quote,
+    Csv,
+    Json,
 }

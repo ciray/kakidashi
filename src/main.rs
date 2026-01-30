@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 use flate2::read::MultiGzDecoder;
 use std::io::Read;
 
@@ -30,6 +30,14 @@ pub struct Args {
     )]
     pub no_random: bool,
 
+    #[arg(
+        short,
+        long,
+        help = "Filter queries [format: key=value] [possible keys: author, title, text]",
+        value_parser
+    )]
+    pub query: Vec<Query>,
+
     #[arg(short, long, help = "Output format")]
     #[clap(value_enum, default_value_t=Format::Plain)]
     pub format: Format,
@@ -37,14 +45,33 @@ pub struct Args {
     #[arg(
         short,
         long,
-        help = "Filter queries [format: key=value] [possible keys: author, title]",
-        value_parser
+        value_parser = template_validator,
+        help = "Template only for 'quote' format [possible laceholders: {author}, {title}, {text}, {url}. example: '{text} - {author} ({title})']"
     )]
-    pub query: Vec<Query>,
+    pub template: Option<String>,
+}
+
+impl Args {
+    fn validate(&self) -> Result<(), clap::Error> {
+        if self.template.is_some() {
+            match self.format {
+                Format::Quote => Ok(()),
+                _ => Err(Self::command().error(
+                    clap::error::ErrorKind::ArgumentConflict,
+                    "--template can only be used with --format quote",
+                )),
+            }
+        } else {
+            Ok(())
+        }
+    }
 }
 
 fn main() {
     let args = Args::parse();
+    if let Err(e) = args.validate() {
+        e.exit();
+    }
 
     let bytes = include_bytes!("resources/data.csv.gz");
     let records = read(bytes);
@@ -54,7 +81,7 @@ fn main() {
         .filter(&args.query)
         .random(!args.no_random)
         .take(n)
-        .print(&args.format);
+        .print(&args.format, args.template.as_ref());
 }
 
 fn read(bytes: &[u8]) -> Vec<WorkRecord> {
@@ -68,4 +95,19 @@ fn read(bytes: &[u8]) -> Vec<WorkRecord> {
         .from_reader(&decompressed[..]);
 
     csv.deserialize().filter_map(Result::ok).collect()
+}
+
+fn template_validator(s: &str) -> Result<String, String> {
+    if s.contains("{author}")
+        || s.contains("{title}")
+        || s.contains("{text}")
+        || s.contains("{url}")
+    {
+        Ok(s.to_string())
+    } else {
+        Err(
+            "Template must contain at least one of the placeholders: {author}, {title}, {text}, {url}"
+                .to_string(),
+        )
+    }
 }
