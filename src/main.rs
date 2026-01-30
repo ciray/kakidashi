@@ -1,12 +1,10 @@
 use clap::{CommandFactory, Parser};
 use flate2::read::MultiGzDecoder;
+use inquire::{InquireError, Select};
 use std::io::Read;
 
 mod models;
-
-use models::Work;
-use models::Works;
-use models::{Format, Query};
+use models::{Format, Query, QueryKey, Work, Works};
 
 fn main() {
     let args = Args::parse();
@@ -17,8 +15,14 @@ fn main() {
     let bytes = include_bytes!("resources/data.csv.gz");
     let works = read(bytes);
 
+    let selected_query: Option<Vec<Query>> = if args.interactive {
+        select(&works)
+    } else {
+        None
+    };
+
     works
-        .filter(&args.query)
+        .filter(&selected_query.unwrap_or(args.query))
         .random(!args.no_random)
         .take(if args.all { works.len() } else { args.number })
         .print(&args.format, args.template.as_ref());
@@ -27,7 +31,7 @@ fn main() {
 #[derive(Parser, Debug)]
 #[command(version, about)]
 pub struct Args {
-    #[arg(short, long, default_value_t = 1, help = "Number of records to output")]
+    #[arg(short, long, default_value_t = 1, help = "Number to output")]
     pub number: usize,
 
     #[arg(
@@ -35,15 +39,11 @@ pub struct Args {
         long,
         default_value_t = false,
         conflicts_with = "number",
-        help = "Output all records [conflicts with --number]"
+        help = "Output all [conflicts with --number]"
     )]
     pub all: bool,
 
-    #[arg(
-        long,
-        default_value_t = false,
-        help = "Disable randomization of records"
-    )]
+    #[arg(long, default_value_t = false, help = "Disable randomization")]
     pub no_random: bool,
 
     #[arg(
@@ -53,6 +53,15 @@ pub struct Args {
         value_parser
     )]
     pub query: Vec<Query>,
+
+    #[arg(
+        short,
+        long,
+        default_value_t = false,
+        conflicts_with = "query",
+        help = "Interactive selection mode [conflicts with --query]"
+    )]
+    interactive: bool,
 
     #[arg(short, long, help = "Output format")]
     #[clap(value_enum, default_value_t=Format::Plain)]
@@ -109,4 +118,28 @@ fn read(bytes: &[u8]) -> Vec<Work> {
         .from_reader(&decompressed[..]);
 
     csv.deserialize().filter_map(Result::ok).collect()
+}
+
+fn select(works: &Vec<Work>) -> Option<Vec<Query>> {
+    let selected_author = Select::new("Select author:", works.authors()).prompt();
+    let selected_title = if let Ok(author) = &selected_author {
+        Select::new("Select title:", works.titles(author)).prompt()
+    } else {
+        Err(InquireError::OperationCanceled)
+    };
+
+    if let (Ok(author), Ok(title)) = (selected_author, selected_title) {
+        Some(vec![
+            Query {
+                key: QueryKey::Author,
+                value: author,
+            },
+            Query {
+                key: QueryKey::Title,
+                value: title,
+            },
+        ])
+    } else {
+        None
+    }
 }
