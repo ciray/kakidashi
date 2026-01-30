@@ -172,8 +172,9 @@ pub fn extract_text_from_zip(zip_path: &Path) -> Option<String> {
     //
     // TODO: 条件について未検証
     // NG例:
-    // 1172,村山 籌子,44946,〈ピツコロさん〉,https://www.aozora.gr.jp/cards/001172/files/44946_50976.html,「さよなら年寄の学者さん。
-    // 311,宮本 百合子,4232,バルザック,https://www.aozora.gr.jp/cards/000311/files/4232_14811.html,「幻滅」より。
+    // 村山 籌子,〈ピツコロさん〉,「さよなら年寄の学者さん。,https://www.aozora.gr.jp/cards/001172/files/44946_50976.html
+    // 宮本 百合子,バルザック,「幻滅」より。,https://www.aozora.gr.jp/cards/000311/files/4232_14811.html
+    // 倉田 百三,出家とその弟子,松若（その息。,https://www.aozora.gr.jp/cards/000256/files/1412_24371.html
     let first_line = text
         .lines()
         .filter(|line| line.starts_with('　'))
