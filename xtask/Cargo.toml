@@ -8,6 +8,7 @@ anyhow = "1"
 aozora-core = "0.7.1"
 aozora2 = "0.2.0"
 csv = "1.4.0"
+flate2 = "1.1.8"
 rayon = "1.11.0"
 scraper = "0.25"
 
