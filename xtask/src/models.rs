@@ -1,13 +1,11 @@
 #[derive(Debug, Clone)]
 pub struct Author {
-    pub id: String,
     pub name: String,
     pub page_path: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct Work {
-    pub id: String,
     pub title: String,
     pub page_path: String,
 }
@@ -15,15 +13,13 @@ pub struct Work {
 #[derive(Debug, Clone)]
 pub struct WorkLink {
     pub zip_path: String,
-    pub html_link: Option<String>,
+    pub url: Option<String>,
 }
 
 #[derive(Debug, Clone)]
 pub struct WorkRecord {
-    pub author_id: String,
-    pub author_name: String,
-    pub work_id: String,
-    pub work_title: String,
-    pub html_link: Option<String>,
+    pub author: String,
+    pub title: String,
     pub text: String,
+    pub url: Option<String>,
 }

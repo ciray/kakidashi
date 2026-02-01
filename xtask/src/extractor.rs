@@ -27,7 +27,6 @@ pub fn extract_authors(author_list_path: &Path) -> Option<Vec<Author>> {
                 parse_id_from_href(href, "person", ".html").map(|id| {
                     let page_path = index_pages_dir.join(format!("person{}.html", id));
                     Author {
-                        id,
                         name,
                         page_path: page_path.to_string_lossy().to_string(),
                     }
@@ -77,7 +76,6 @@ pub fn extract_works(author: &Author) -> Option<Vec<Work>> {
                         .and_then(|s| s.split('/').next())?;
                     let page_path = cards_dir.join(author_id).join(format!("card{}.html", id));
                     Some(Work {
-                        id,
                         title,
                         page_path: page_path.to_string_lossy().to_string(),
                     })
@@ -156,7 +154,7 @@ pub fn extract_links(work_page_path: &Path) -> Option<WorkLink> {
 
     Some(WorkLink {
         zip_path,
-        html_link: html_path,
+        url: html_path,
     })
 }
 
@@ -233,7 +231,7 @@ mod tests {
             "../aozorabunko/cards/000006/files/47064_txt_31250.zip".to_string()
         );
         assert_eq!(
-            work_link.html_link,
+            work_link.url,
             Some("../https://www.aozora.gr.jp/cards/000006/files/47064_31847.html".to_string())
         );
     }
@@ -256,7 +254,7 @@ mod tests {
             "../aozorabunko/cards/001393/files/54926_txt_47247.zip".to_string()
         );
         assert_eq!(
-            work_link.html_link,
+            work_link.url,
             Some("../https://www.aozora.gr.jp/cards/001393/files/54926_53265.html".to_string())
         );
     }
@@ -271,7 +269,7 @@ mod tests {
             "../aozorabunko/cards/000148/files/769_ruby_565.zip".to_string()
         );
         assert_eq!(
-            work_link.html_link,
+            work_link.url,
             Some("../https://www.aozora.gr.jp/cards/000148/files/769_14939.html".to_string())
         );
     }
@@ -286,7 +284,7 @@ mod tests {
             "../aozorabunko/cards/001393/files/54926_txt_47247.zip".to_string()
         );
         assert_eq!(
-            work_link.html_link,
+            work_link.url,
             Some("../https://www.aozora.gr.jp/cards/001393/files/54926_53265.html".to_string())
         );
     }

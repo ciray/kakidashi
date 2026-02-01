@@ -2,7 +2,7 @@ use anyhow::{Ok, Result};
 use flate2::{Compression, write::GzEncoder};
 use rayon::prelude::*;
 use std::fs::{File, create_dir_all};
-use std::io::copy;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 mod extractor;
@@ -19,15 +19,19 @@ fn main() -> Result<()> {
     let mut records = extract(INPUT_PATH);
     records.sort_by_key(|r| {
         (
-            r.author_name.clone(),
-            r.work_title.clone(),
+            r.author.clone(),
+            r.title.clone(),
             r.text.clone(),
-            r.html_link.clone(),
+            r.url.clone(),
         )
     });
+    println!("{}", records.len());
 
     write_csv(&records, OUTPUT_CSV_PATH)?;
-    compress_csv(OUTPUT_CSV_PATH, OUTPUT_GZIP_PATH)?;
+
+    records.retain(|r| !r.text.is_empty());
+    println!("{}", records.len());
+    compress_csv(&records, OUTPUT_GZIP_PATH)?;
 
     Ok(())
 }
@@ -46,12 +50,10 @@ fn extract(aozorabunko: &str) -> Vec<WorkRecord> {
                         extract_text_from_zip(Path::new(&work_link.zip_path)).unwrap_or_default();
 
                     Some(WorkRecord {
-                        author_id: author.id.clone(),
-                        author_name: author.name.clone(),
-                        work_id: work.id,
-                        work_title: work.title,
-                        html_link: work_link.html_link,
+                        author: author.name.clone(),
+                        title: work.title,
                         text,
+                        url: work_link.url,
                     })
                 })
         })
@@ -66,10 +68,10 @@ fn write_csv(records: &Vec<WorkRecord>, output_path: &str) -> Result<()> {
 
     for record in records {
         writer.write_record([
-            &record.author_name,
-            &record.work_title,
+            &record.author,
+            &record.title,
             &record.text,
-            &record.html_link.clone().unwrap_or_default(),
+            &record.url.clone().unwrap_or_default(),
         ])?;
     }
 
@@ -78,12 +80,21 @@ fn write_csv(records: &Vec<WorkRecord>, output_path: &str) -> Result<()> {
     Ok(())
 }
 
-fn compress_csv(input_path: &str, output_path: &str) -> Result<()> {
-    let mut input = File::open(input_path)?;
+fn compress_csv(records: &Vec<WorkRecord>, output_path: &str) -> Result<()> {
     let output = File::create(output_path)?;
     let mut encoder = GzEncoder::new(output, Compression::default());
 
-    copy(&mut input, &mut encoder)?;
+    for record in records {
+        let line = format!(
+            "{},{},{},{}\n",
+            record.author,
+            record.title,
+            record.text,
+            record.url.clone().unwrap_or_default()
+        );
+        encoder.write_all(line.as_bytes())?;
+    }
+
     encoder.finish()?;
 
     Ok(())
