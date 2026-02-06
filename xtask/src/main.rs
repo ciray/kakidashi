@@ -25,12 +25,13 @@ fn main() -> Result<()> {
             r.url.clone(),
         )
     });
-    println!("{}", records.len());
+    println!("Records: {}", records.len());
 
     write_csv(&records, OUTPUT_CSV_PATH)?;
 
     records.retain(|r| !r.text.is_empty());
-    println!("{}", records.len());
+    println!("Records: {} (without empty text)", records.len());
+
     compress_csv(&records, OUTPUT_GZIP_PATH)?;
 
     Ok(())
