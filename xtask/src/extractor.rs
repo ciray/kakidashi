@@ -58,7 +58,7 @@ pub fn extract_works(author: &Author) -> Option<Vec<Work>> {
     let anchor_selector = Selector::parse("a").unwrap();
 
     // 翻訳書除外
-    // TODO: 編者など他パターンは未対応)
+    // TODO: 編者など他パターンは未対応
     let is_original_work = |html: &str| html.contains("作品ID") && !html.contains("著者");
 
     let works = document
@@ -174,6 +174,7 @@ pub fn extract_text_from_zip(zip_path: &Path) -> Option<String> {
     // 宮本 百合子,バルザック,「幻滅」より。,https://www.aozora.gr.jp/cards/000311/files/4232_14811.html
     // 倉田 百三,出家とその弟子,松若（その息。,https://www.aozora.gr.jp/cards/000256/files/1412_24371.html
     // 宮沢 賢治,『春と修羅』補遺,何回か東京で引っぱられた。,https://www.aozora.gr.jp/cards/000081/files/43040_15400.html
+    // 太宰 治,人間失格,私は、その男の写真を三葉、見たことがある。,https://www.aozora.gr.jp/cards/000035/files/301_14912.html
     let first_line = text
         .lines()
         .filter(|line| line.starts_with('　'))
