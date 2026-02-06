@@ -1,0 +1,111 @@
+name: CD
+
+on:
+  push:
+    tags:
+      - "*"
+
+jobs:
+  release:
+    name: Generate, Build and Release
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact: kakidashi
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Generate CSV
+        run: cargo xtask --release
+
+      - name: Check CSV
+        run: |
+          [ -f "src/resources/data.csv.gz" ] || (echo "CSV not found" && exit 1)
+
+      - name: Build
+        run: cargo build --release --locked --target ${{ matrix.target }}
+
+      - name: Smoke test
+        run: |
+          target/${{ matrix.target }}/release/${{ matrix.artifact }} > output.txt
+          [ -s output.txt ] || (echo "No output" && exit 1)
+
+      - name: Generate checksum
+        run: |
+          cd target/${{ matrix.target }}/release
+          sha256sum ${{ matrix.artifact }} > ${{ matrix.artifact }}.sha256
+          cat ${{ matrix.artifact }}.sha256
+
+      - name: Package binary
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar czf ${{ matrix.artifact }}-${{ matrix.target }}.tar.gz \
+            ${{ matrix.artifact }} \
+            ${{ matrix.artifact }}.sha256
+
+      - name: Generate package checksum
+        run: |
+          cd target/${{ matrix.target }}/release
+          sha256sum ${{ matrix.artifact }}-${{ matrix.target }}.tar.gz > ${{ matrix.artifact }}-${{ matrix.target }}.tar.gz.sha256
+          cat ${{ matrix.artifact }}-${{ matrix.target }}.tar.gz.sha256
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create ${{ github.ref_name }} \
+            --title "${{ github.ref_name }}" \
+            --generate-notes \
+            --verify-tag \
+            target/${{ matrix.target }}/release/${{ matrix.artifact }}-${{ matrix.target }}.tar.gz \
+            target/${{ matrix.target }}/release/${{ matrix.artifact }}-${{ matrix.target }}.tar.gz.sha256 \
+            || gh release upload ${{ github.ref_name }} \
+            target/${{ matrix.target }}/release/${{ matrix.artifact }}-${{ matrix.target }}.tar.gz \
+            target/${{ matrix.target }}/release/${{ matrix.artifact }}-${{ matrix.target }}.tar.gz.sha256 \
+            --clobber
+
+  update-version:
+    name: Update Cargo.toml version
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION="${{ github.ref_name }}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Extracted version: $VERSION"
+      
+      - name: Update Cargo.toml
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          sed -i "s/^version = \".*\"/version = \"$VERSION\"/" Cargo.toml
+          echo "Updated Cargo.toml:"
+          grep '^version = ' Cargo.toml
+      
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Cargo.toml
+          git diff --staged --quiet || git commit -m "chore: bump version to ${{ steps.version.outputs.version }}"
+          git push origin HEAD:main
