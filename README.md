@@ -69,7 +69,7 @@ $ kakidashi --interactive
 ### 出力テンプレートを指定 (ついでにcowsay)
 
 ```bash
-$ kakidashi --format quote --template "{text}\n    {author}  『{title}』" | cowsay
+$ kakidashi --format quote --template "{text}\n\n{author}  『{title}』" | cowsay
  ________________________________
 / よだかは、実にみにくい鳥です。 \
 |                                |
